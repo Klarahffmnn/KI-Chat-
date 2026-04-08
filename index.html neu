@@ -2,159 +2,140 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <title>CiteFlow Desktop - KI Chat</title>
+    <title>CiteFlow Desktop - Prototyp</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <link href="https://cdn.jsdelivr.net/npm/lucide-static@0.321.0/font/lucide.min.css" rel="stylesheet">
     <style>
-        body { overflow: hidden; font-family: 'Inter', sans-serif; }
-        .custom-scrollbar::-webkit-scrollbar { width: 5px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+        body { overflow: hidden; height: 100vh; width: 100vw; }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
     </style>
 </head>
-<body class="bg-slate-200">
+<body class="bg-white">
     <div id="root"></div>
 
     <script type="text/babel">
         const { useState } = React;
 
-        // --- DEIN BEREICH: KI-CHAT KOMPONENTE ---
-        function KIChat() {
-            const [messages, setMessages] = useState([
-                { 
-                    id: 1, 
-                    role: 'assistant', 
-                    text: "Ich durchsuche deine Quellen. Filter: [Alle Sammlungen v]",
-                    isSystem: true 
-                },
-                {
-                    id: 2,
-                    role: 'assistant',
-                    text: "Autor X definiert das Thema als einen iterativen Prozess der Validierung.",
-                    warning: "Widerspruch zu Autor Y erkannt!",
-                    confidence: 95,
-                    sources: ["Müller, S. 12", "Weber, S. 5"]
-                }
-            ]);
-
-            return (
-                <div className="flex flex-col h-full bg-white shadow-inner">
-                    {/* Chat Header aus deiner Skizze */}
-                    <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-                        <div>
-                            <h2 className="font-bold text-slate-800">KI - Chat</h2>
-                            <p className="text-[10px] text-slate-500 italic">Filter: [Aktuelle Sammlung v]</p>
-                        </div>
-                        <div className="flex gap-2 text-[10px]">
-                            <span className="border px-1 rounded bg-white">DE / EN</span>
-                            <span className="border px-1 rounded bg-white">Lang v</span>
-                        </div>
-                    </div>
-
-                    {/* Chat Verlauf */}
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-                        {messages.map(m => (
-                            <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[90%] p-3 rounded-lg ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-slate-50 border border-slate-200 text-slate-800'}`}>
-                                    <p className="text-sm">{m.text}</p>
-                                    
-                                    {/* Widerspruch-Warnung (Skizze) */}
-                                    {m.warning && (
-                                        <div className="mt-2 flex items-center gap-2 text-red-600 text-[11px] font-bold bg-red-50 p-1 rounded border border-red-100">
-                                            <i className="lucide-alert-triangle w-3 h-3"></i> {m.warning}
-                                        </div>
-                                    )}
-
-                                    {/* Confidence & Quellen (Skizze) */}
-                                    {m.confidence && (
-                                        <div className="mt-4 pt-2 border-t border-slate-200">
-                                            <div className="flex justify-between text-[10px] text-slate-500 mb-1">
-                                                <span>Confidence</span>
-                                                <span>{m.confidence}% (i)</span>
-                                            </div>
-                                            <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-slate-800 h-full" style={{width: m.confidence + '%'}}></div>
-                                            </div>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                <span className="text-[10px] text-slate-500 uppercase font-bold w-full">Quellen:</span>
-                                                {m.sources.map(s => (
-                                                    <span key={s} className="flex items-center gap-1 bg-white border px-1.5 py-0.5 rounded text-[10px] shadow-sm cursor-pointer hover:bg-blue-50">
-                                                        {s} <i className="lucide-eye w-3 h-3 text-slate-400"></i>
-                                                    </span>
-                                                ))}
-                                            </div>
-                                            {/* Action Bar unter der Nachricht */}
-                                            <div className="mt-3 flex gap-4 text-slate-400">
-                                                <i className="lucide-copy w-3 h-3 cursor-pointer hover:text-blue-600"></i>
-                                                <i className="lucide-bookmark w-3 h-3 cursor-pointer hover:text-blue-600"></i>
-                                                <span className="text-[9px] border px-1 rounded cursor-pointer hover:bg-slate-200">Verknüpfen mit Kap. 1 v</span>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-
-                    {/* Eingabebereich mit Prompt-Chips */}
-                    <div className="p-4 border-t bg-white">
-                        <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar mb-2">
-                            {["Fasse zusammen", "Gegenargumente", "Quellenvergleich"].map(chip => (
-                                <button key={chip} className="text-[10px] border rounded-full px-3 py-1 whitespace-nowrap bg-slate-50 hover:bg-blue-50">{chip}</button>
-                            ))}
-                        </div>
-                        <div className="relative">
-                            <input className="w-full bg-slate-100 rounded-lg pl-3 pr-10 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400" placeholder="Frag mich etwas..." />
-                            <i className="lucide-send w-4 h-4 absolute right-3 top-2.5 text-slate-400 cursor-pointer"></i>
-                        </div>
-                        <p className="text-[9px] text-center text-slate-400 mt-2">@ chatverlauf durchsuchen</p>
-                    </div>
-                </div>
-            );
-        }
-
-        // --- RAHMEN: NAVIGATION (SIDEBAR LINKS) ---
         function CiteFlowApp() {
-            const [activeTab, setActiveTab] = useState('KI-Chat');
-            
-            const tabs = [
-                { id: 'Suche', icon: 'lucide-search' },
+            const [activeTab, setActiveTab] = useState('KI Chat');
+
+            // Die Menüpunkte exakt von deiner Skizze
+            const menuItems = [
+                { id: 'Suchfeld', icon: 'lucide-search' },
                 { id: 'Dashboard', icon: 'lucide-layout-dashboard' },
                 { id: 'Bibliothek', icon: 'lucide-library' },
                 { id: 'PDF-Reader', icon: 'lucide-file-text' },
                 { id: 'Zitieren', icon: 'lucide-quote' },
-                { id: 'KI-Chat', icon: 'lucide-message-square' },
+                { id: 'KI Chat', icon: 'lucide-message-square' },
                 { id: 'Aufgaben', icon: 'lucide-check-square' }
             ];
 
             return (
-                <div className="flex h-screen w-screen bg-slate-100 overflow-hidden">
-                    {/* Linke Sidebar (Wählleiste) */}
-                    <div className="w-48 bg-white border-r flex flex-col pt-4">
-                        <div className="px-4 mb-8 text-blue-600 font-black text-xl tracking-tighter italic">CITEFLOW</div>
-                        {tabs.map(tab => (
+                <div className="flex h-screen w-screen border-4 border-slate-800 rounded-lg overflow-hidden shadow-2xl bg-white">
+                    
+                    {/* LINKE SEITENLEISTE (Navigation) */}
+                    <div className="w-44 border-r-2 border-slate-300 flex flex-col bg-white">
+                        {menuItems.map((item) => (
                             <button 
-                                key={tab.id}
-                                onClick={() => setActiveTab(tab.id)}
-                                className={`flex items-center gap-3 px-4 py-3 text-sm transition-all ${activeTab === tab.id ? 'bg-blue-50 text-blue-700 border-r-4 border-blue-700 font-bold' : 'text-slate-500 hover:bg-slate-50'}`}
+                                key={item.id}
+                                onClick={() => setActiveTab(item.id)}
+                                className={`flex items-center gap-2 px-3 py-3 border-b border-slate-200 text-xs font-medium transition-colors
+                                    ${activeTab === item.id ? 'bg-slate-200 text-black' : 'text-slate-600 hover:bg-slate-50'}`}
                             >
-                                <i className={`${tab.icon} w-4 h-4`}></i> {tab.id}
+                                <i className={`${item.icon} w-4 h-4`}></i> {item.id}
                             </button>
                         ))}
-                        <div className="mt-auto p-4 border-t text-[10px] text-slate-400">
-                            Onboarding Mode
+                        
+                        <div className="mt-auto p-3 border-t-2 border-slate-300 italic text-[10px]">
+                            <span className="border rounded-full px-2 py-0.5 border-slate-800">Onboarding</span>
                         </div>
                     </div>
 
-                    {/* Hauptbereich (Inhalt je nach Reiter) */}
-                    <div className="flex-1 flex flex-col h-full overflow-hidden">
-                        {activeTab === 'KI-Chat' ? <KIChat /> : (
-                            <div className="flex items-center justify-center h-full text-slate-300 italic">
-                                Hier wird der Bereich für {activeTab} von deinen Kommilitonen eingefügt.
+                    {/* HAUPTBEREICH (KI Chat Fenster) */}
+                    <div className="flex-1 flex flex-col relative bg-white">
+                        
+                        {/* Chat Header */}
+                        <div className="p-4 border-b-2 border-slate-300 flex justify-between items-start">
+                            <div className="flex flex-col gap-2">
+                                <h2 className="text-xl font-bold italic underline">KI - Chat</h2>
+                                <div className="text-xs flex gap-2">
+                                    <span>[i] durchsucht durch deine Quelle.. (x)</span>
+                                    <span className="ml-4 font-bold border px-1">[DE / EN]</span>
+                                </div>
+                                <div className="text-xs">
+                                    Filter: [aktuelle Sammlung v] <span className="ml-4 border px-1">[Lang v]</span>
+                                </div>
                             </div>
-                        )}
+                        </div>
+
+                        {/* Chat Inhalt (Simulation der Skizze) */}
+                        <div className="flex-1 p-6 space-y-8 overflow-y-auto no-scrollbar">
+                            
+                            {/* User Frage */}
+                            <div className="flex justify-end">
+                                <span className="border-2 border-slate-800 px-3 py-1 rounded text-sm font-medium">
+                                    [user: was sagt Autor X ... ?]
+                                </span>
+                            </div>
+
+                            {/* KI Antwort mit Warnung */}
+                            <div className="space-y-4">
+                                <p className="text-sm">AI: Autor X definiert das Thema als ...</p>
+                                
+                                <div className="flex items-center gap-2 text-red-600 font-bold text-sm bg-red-50 p-2 border-2 border-red-600 rounded">
+                                    <i className="lucide-alert-triangle w-4 h-4"></i>
+                                    ⚠ Widerspruch zu Autor Y erkannt!
+                                </div>
+
+                                {/* Confidence Balken */}
+                                <div className="pt-4 flex items-center gap-4">
+                                    <span className="text-sm font-bold italic">confidence</span>
+                                    <div className="w-64 h-6 border-2 border-slate-800 relative bg-slate-100">
+                                        <div className="bg-slate-600 h-full w-[95%]"></div>
+                                        <span className="absolute right-[-40px] top-0 text-sm font-bold italic">95% (i)</span>
+                                    </div>
+                                </div>
+
+                                {/* Quellen Zeile */}
+                                <div className="flex items-center gap-4 py-2">
+                                    <span className="text-sm font-bold italic">Quellen:</span>
+                                    <span className="border-2 border-slate-800 px-2 py-1 text-xs flex items-center gap-1">
+                                        [Müller, S. 12 (👁️)]
+                                    </span>
+                                    <span className="border-2 border-slate-800 px-2 py-1 text-xs flex items-center gap-1">
+                                        [Weber, S. 5 (👁️)]
+                                    </span>
+                                </div>
+
+                                {/* Action Buttons */}
+                                <div className="flex gap-4 text-sm font-bold italic">
+                                    <span>(💾) (📄) (zitat)</span>
+                                    <span className="border px-2">[verknüpfen mit kap. 1 v]</span>
+                                    <span>(vx)</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Eingabebereich unten */}
+                        <div className="p-4 border-t-2 border-slate-300 space-y-4">
+                            <div className="flex gap-4">
+                                <button className="border-2 border-slate-800 px-2 py-1 text-xs font-bold">[Fasse zusammen]</button>
+                                <button className="border-2 border-slate-800 px-2 py-1 text-xs font-bold">[Gegenargumente]</button>
+                                <button className="border-2 border-slate-800 px-2 py-1 text-xs font-bold">[Quellenvergleich]</button>
+                            </div>
+                            
+                            <div className="flex items-center gap-2 border-b-2 border-slate-800 pb-1">
+                                <span className="italic text-sm">Frag mich etwas ...</span>
+                                <span className="ml-auto text-sm italic">(@) (>)</span>
+                            </div>
+                            
+                            <div className="text-center italic text-xs border border-slate-400 py-1">
+                                [ @ chatverlauf durchsuchen ]
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
