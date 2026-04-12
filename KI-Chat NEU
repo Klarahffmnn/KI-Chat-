@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CiteFlow – Literaturverwaltung</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; }
+    body { font-family: 'Inter', system-ui, sans-serif; background: #f1f5f9; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes bounce { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
+    .b1{animation:bounce 1s ease-in-out infinite}
+    .b2{animation:bounce 1s ease-in-out infinite 0.15s}
+    .b3{animation:bounce 1s ease-in-out infinite 0.3s}
+    @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+    .fade-in { animation: fadeIn 0.25s ease forwards; }
+    textarea { font-family: inherit; }
+    .tooltip-wrap { position: relative; display: inline-flex; }
+    .tooltip-box {
+      display: none; position: absolute; bottom: calc(100% + 6px); left: 50%;
+      transform: translateX(-50%); background: #1e293b; color: #f8fafc;
+      font-size: 11px; line-height: 1.5; padding: 7px 10px; border-radius: 8px;
+      white-space: normal; width: 220px; z-index: 100; pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+    .tooltip-wrap:hover .tooltip-box { display: block; }
+    .tooltip-box::after {
+      content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%);
+      border:5px solid transparent; border-top-color:#1e293b;
+    }
+    input[type=text]:focus { outline: 2px solid #2563eb; outline-offset: 1px; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useRef, useEffect, useCallback } = React;
+
+/* ── Icons ── */
+const Ic = (paths) => ({ size=16, color="currentColor", style={} }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+    {paths}
+  </svg>
+);
+const IcSend        = Ic(<><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></>);
+const IcBookOpen    = Ic(<><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></>);
+const IcEye         = Ic(<><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></>);
+const IcCopy        = Ic(<><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></>);
+const IcBookmark    = Ic(<path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/>);
+const IcChevDown    = Ic(<polyline points="6 9 12 15 18 9"/>);
+const IcChevRight   = Ic(<polyline points="9 18 15 12 9 6"/>);
+const IcAlert       = Ic(<><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></>);
+const IcCheck       = Ic(<><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></>);
+const IcInfo        = Ic(<><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></>);
+const IcMsg         = Ic(<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>);
+const IcX           = Ic(<><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></>);
+const IcFile        = Ic(<><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></>);
+const IcThumbUp     = Ic(<><path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3H14z"/><path d="M7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3"/></>);
+const IcThumbDown   = Ic(<><path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3H10z"/><path d="M17 2h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17"/></>);
+const IcLayers      = Ic(<><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></>);
+const IcSearch      = Ic(<><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></>);
+const IcGlobe       = Ic(<><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></>);
+const IcLink        = Ic(<><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></>);
+const IcQuote       = Ic(<><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"/><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"/></>);
+const IcStar        = Ic(<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>);
+const IcMap         = Ic(<><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></>);
+const IcSettings    = Ic(<><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></>);
+
+/* ── Nav items ── */
+const NAV = [
+  { id:"library",   label:"Bibliothek",      Icon:IcBookOpen, active:true  },
+  { id:"chat",      label:"KI-Chat",         Icon:IcMsg,      active:true  },
+  { id:"map",       label:"Knowledge Map",   Icon:IcMap,      active:false },
+  { id:"cite",      label:"Zitieren",        Icon:IcQuote,    active:false },
+  { id:"tasks",     label:"Aufgabenplaner",  Icon:IcStar,     active:false },
+  { id:"search",    label:"Suche",           Icon:IcSearch,   active:false },
+  { id:"settings",  label:"Einstellungen",   Icon:IcSettings, active:false },
+];
+
+/* ── Data ── */
+const PROMPT_CHIPS = [
+  "Fasse die 3 wichtigsten Theorien zusammen",
+  "Gibt es Widersprüche in meinen Quellen?",
+  "Was sagt Autor X zu Thema Y?",
+  "Welche Gegenargumente gibt es?",
+  "Vergleiche Quelle A mit Quelle B",
+  "Kernthese zusammenfassen",
+];
+
+const SCOPES = ["Alle Quellen (12)", "Nur markierte (3)", "Sammlung: Habermas", "Sammlung: Seminararbeit"];
+
+const INIT_MSGS = [
+  { id:1, role:"assistant", isIntro:true,
+    text:"Ich durchsuche ausschließlich deine hochgeladenen PDFs – keine Internetquellen. Stelle mir eine Frage zu deiner Literatur." },
+  { id:2, role:"user", text:"Was sagt Habermas zur kommunikativen Vernunft?" },
+  { id:3, role:"assistant",
+    text:"Habermas versteht kommunikative Vernunft als die Fähigkeit von Akteuren, durch sprachliche Verständigung Konsens zu erzielen. Sie basiert auf der Idee eines herrschaftsfreien Diskurses, in dem das bessere Argument zählt – unabhängig von Macht oder Status.",
+    confidence:92, confidenceLabel:"Hohe Sicherheit", confidenceLevel:"high",
+    sources:[
+      { title:"Theorie des kommunikativen Handelns", page:28, author:"Habermas", year:1981 },
+      { title:"Theorie des kommunikativen Handelns", page:44, author:"Habermas", year:1981 },
+    ], sourceCount:"multi", feedback:null,
+    conflictWarning:false,
+  },
+  { id:4, role:"user", text:"Wie kritisiert er die Systemtheorie?" },
+  { id:5, role:"assistant",
+    text:"Habermas kritisiert die Systemtheorie dafür, dass sie soziale Integration rein funktional erklärt und dabei die normative Dimension menschlicher Kommunikation ausblendet.",
+    confidence:54, confidenceLabel:"Mittlere Sicherheit", confidenceLevel:"mid",
+    sources:[{ title:"Theorie des kommunikativen Handelns", page:91, author:"Habermas", year:1981 }],
+    sourceCount:"single", feedback:null,
+    warning:"Nur eine Quelle gefunden – weitere Belege empfohlen.",
+    conflictWarning:false,
+  },
+  { id:6, role:"user", text:"Vergleiche Quelle A mit Quelle B" },
+  { id:7, role:"assistant",
+    text:"Während Habermas die kommunikative Rationalität in den Vordergrund stellt, betont Luhmann die Autopoiesis sozialer Systeme. Habermas sieht Sprache als Medium der Integration – Luhmann hingegen als bloßen Systemcode.",
+    confidence:71, confidenceLabel:"Mittlere Sicherheit", confidenceLevel:"mid",
+    sources:[
+      { title:"Theorie des kommunikativen Handelns", page:44, author:"Habermas", year:1981 },
+      { title:"Soziale Systeme", page:17, author:"Luhmann", year:1984 },
+    ], sourceCount:"multi", feedback:null,
+    conflictWarning:true,
+    conflictMsg:"Widerspruch erkannt: Habermas (S. 44) und Luhmann (S. 17) vertreten gegensätzliche Positionen zur Rolle von Sprache in sozialen Systemen.",
+  },
+  { id:8, role:"user", text:"Was sagt Habermas zu digitalen Öffentlichkeiten?" },
+  { id:9, role:"assistant",
+    text:"Habermas hat seine Theorie der Öffentlichkeit auf digitale Räume ausgeweitet und die fragmentierende Wirkung sozialer Medien thematisiert.",
+    confidence:18, confidenceLabel:"Niedrige Sicherheit", confidenceLevel:"low",
+    sources:[], sourceCount:"none", feedback:null,
+    warning:"Kein Beleg in deinen Quellen gefunden. Diese Antwort basiert auf allgemeinem KI-Wissen – nicht auf deiner Bibliothek.",
+    conflictWarning:false,
+  },
+];
+
+const CONF_COLORS = {
+  high:{ bar:"#10b981", text:"#065f46", bg:"#f0fdf4", border:"#a7f3d0", label:"Hohe Sicherheit" },
+  mid: { bar:"#f59e0b", text:"#78350f", bg:"#fffbeb", border:"#fde68a", label:"Mittlere Sicherheit" },
+  low: { bar:"#ef4444", text:"#7f1d1d", bg:"#fef2f2", border:"#fecaca", label:"Niedrige Sicherheit" },
+};
+
+/* ── Tooltip ── */
+function Tooltip({ tip, children }) {
+  return (
+    <span className="tooltip-wrap">
+      {children}
+      <span className="tooltip-box">{tip}</span>
+    </span>
+  );
+}
+
+/* ── Confidence Bar ── */
+function ConfidenceBar({ level, label, value, matchCount }) {
+  const c = CONF_COLORS[level];
+  const tip = `Dieser Wert basiert auf ${matchCount || (level==="high"?4:level==="mid"?2:0)} Übereinstimmungen in deiner Literatur. Klicke auf die Quellen, um den Kontext zu prüfen.`;
+  return (
+    <Tooltip tip={tip}>
+      <div style={{ marginTop:8, padding:"8px 12px", borderRadius:8,
+        background:c.bg, border:`1px solid ${c.border}`, cursor:"help", width:"100%" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:4 }}>
+          <span style={{ fontSize:11, fontWeight:500, color:c.text }}>{label}</span>
+          <span style={{ fontSize:11, color:c.text }}>{value}%</span>
+        </div>
+        <div style={{ height:6, borderRadius:3, background:"rgba(255,255,255,0.6)", overflow:"hidden" }}>
+          <div style={{ height:"100%", borderRadius:3, background:c.bar, width:`${value}%`, transition:"width 0.7s" }} />
+        </div>
+      </div>
+    </Tooltip>
+  );
+}
+
+/* ── Source Badge ── */
+function SourceBadge({ source, onCheck, style: fmt }) {
+  const citation = fmt === "apa"
+    ? `${source.author}, ${source.year}, S. ${source.page}`
+    : `${source.author} (${source.year}), S. ${source.page}`;
+  const tip = `Klicken um die Originalstelle in „${source.title}" auf Seite ${source.page} zu öffnen – Textstelle wird gelb markiert.`;
+  return (
+    <Tooltip tip={tip}>
+      <button onClick={() => onCheck(source)}
+        style={{ display:"inline-flex", alignItems:"center", gap:4, fontSize:11,
+          padding:"3px 9px", borderRadius:99, background:"#eff6ff", color:"#1d4ed8",
+          border:"1px solid #bfdbfe", cursor:"pointer", fontFamily:"inherit" }}>
+        <IcFile size={10} color="#1d4ed8" />
+        {citation}
+        <IcEye size={10} color="#93c5fd" />
+      </button>
+    </Tooltip>
+  );
+}
+
+/* ── Source Modal ── */
+function SourceModal({ source, onClose }) {
+  return (
+    <div onClick={onClose} style={{
+      position:"absolute", inset:0, background:"rgba(0,0,0,0.4)",
+      display:"flex", alignItems:"center", justifyContent:"center",
+      zIndex:50, borderRadius:12, padding:16 }}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        background:"#fff", borderRadius:16, padding:20, maxWidth:360, width:"100%",
+        boxShadow:"0 8px 32px rgba(0,0,0,0.15)" }}>
+        <div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", marginBottom:14 }}>
+          <span style={{ fontSize:13, fontWeight:500, color:"#1e293b" }}>Originalstelle im PDF</span>
+          <button onClick={onClose} style={{ background:"none", border:"none", cursor:"pointer" }}>
+            <IcX size={16} color="#94a3b8" />
+          </button>
+        </div>
+        <div style={{ background:"#f8fafc", borderRadius:10, padding:14, marginBottom:12 }}>
+          <p style={{ fontSize:11, color:"#94a3b8", marginBottom:3 }}>{source.author} · {source.title} · Seite {source.page}</p>
+          <div style={{ background:"#fef9c3", border:"1px solid #fde68a", borderRadius:8, padding:10, marginTop:8 }}>
+            <p style={{ fontSize:12, color:"#374151", lineHeight:1.65, fontStyle:"italic" }}>
+              „...die kommunikative Vernunft drückt sich zunächst in der vereinigenden Kraft intersubjektiv geteilter Sprache aus, durch die Einverständnis sowohl möglich als auch nötig wird..."
+            </p>
+            <p style={{ fontSize:10, color:"#92400e", marginTop:6, fontWeight:500 }}>
+              ↑ Markierte Textstelle — Seite {source.page}
+            </p>
+          </div>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button onClick={onClose} style={{
+            flex:1, fontSize:12, color:"#2563eb", border:"1px solid #bfdbfe",
+            borderRadius:10, padding:"9px 0", background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+            PDF öffnen (S. {source.page})
+          </button>
+          <button onClick={onClose} style={{
+            flex:1, fontSize:12, color:"#475569", border:"1px solid #e2e8f0",
+            borderRadius:10, padding:"9px 0", background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+            Schließen
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Chat Message ── */
+function ChatMessage({ msg, onFeedback, onSourceCheck, citStyle }) {
+  const [copied, setCopied] = useState(false);
+  const [saved, setSaved]   = useState(false);
+  const [showCite, setShowCite] = useState(false);
+
+  if (msg.role === "user") {
+    return (
+      <div className="fade-in" style={{ display:"flex", justifyContent:"flex-end", marginBottom:12 }}>
+        <div style={{ maxWidth:"80%", background:"#2563eb", color:"#fff",
+          fontSize:13, borderRadius:"16px 16px 4px 16px", padding:"10px 14px", lineHeight:1.6 }}>
+          {msg.text}
+        </div>
+      </div>
+    );
+  }
+  if (msg.isIntro) {
+    return (
+      <div className="fade-in" style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:16 }}>
+        <div style={{ width:28, height:28, borderRadius:"50%", background:"#dbeafe",
+          display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:2 }}>
+          <IcBookOpen size={14} color="#2563eb" />
+        </div>
+        <div style={{ background:"#eff6ff", border:"1px solid #dbeafe",
+          borderRadius:"16px 16px 16px 4px", padding:"12px 14px", flex:1 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:6, marginBottom:5 }}>
+            <IcInfo size={12} color="#3b82f6" />
+            <span style={{ fontSize:11, fontWeight:500, color:"#1d4ed8" }}>Nur lokale PDFs – keine KI-Halluzination aus dem Internet</span>
+          </div>
+          <p style={{ fontSize:13, color:"#1e40af", lineHeight:1.6 }}>{msg.text}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const warnBg   = msg.confidenceLevel==="low" ? "#fef2f2" : "#fffbeb";
+  const warnBd   = msg.confidenceLevel==="low" ? "#fecaca" : "#fde68a";
+  const warnCol  = msg.confidenceLevel==="low" ? "#991b1b" : "#92400e";
+
+  return (
+    <div className="fade-in" style={{ display:"flex", alignItems:"flex-start", gap:8, marginBottom:16 }}>
+      <div style={{ width:28, height:28, borderRadius:"50%", background:"#f1f5f9",
+        display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0, marginTop:2 }}>
+        <IcLayers size={14} color="#64748b" />
+      </div>
+      <div style={{ flex:1, minWidth:0 }}>
+        <div style={{ background:"#fff", border:"1px solid #e2e8f0",
+          borderRadius:"16px 16px 16px 4px", padding:"12px 14px",
+          boxShadow:"0 1px 4px rgba(0,0,0,0.05)" }}>
+          <p style={{ fontSize:13, color:"#1e293b", lineHeight:1.65 }}>{msg.text}</p>
+
+          {/* Confidence */}
+          {msg.confidence != null &&
+            <ConfidenceBar level={msg.confidenceLevel} label={msg.confidenceLabel}
+              value={msg.confidence} matchCount={msg.sources?.length*2||0} />}
+
+          {/* Conflict warning */}
+          {msg.conflictWarning &&
+            <div style={{ marginTop:8, display:"flex", gap:6, fontSize:11,
+              background:"#fff7ed", border:"1px solid #fed7aa", borderRadius:8,
+              padding:"8px 10px", color:"#9a3412", alignItems:"flex-start" }}>
+              <IcAlert size={12} color="#ea580c" style={{ flexShrink:0, marginTop:1 }} />
+              <span>{msg.conflictMsg}</span>
+            </div>}
+
+          {/* General warning */}
+          {msg.warning && !msg.conflictWarning &&
+            <div style={{ marginTop:8, display:"flex", gap:6, fontSize:11,
+              background:warnBg, border:`1px solid ${warnBd}`, borderRadius:8,
+              padding:"8px 10px", color:warnCol, alignItems:"flex-start" }}>
+              <IcAlert size={12} color="currentColor" style={{ flexShrink:0, marginTop:1 }} />
+              <span>{msg.warning}</span>
+            </div>}
+
+          {/* Sources */}
+          {msg.sources?.length > 0 &&
+            <div style={{ marginTop:10 }}>
+              <p style={{ fontSize:11, color:"#94a3b8", marginBottom:6 }}>
+                {msg.sourceCount==="multi" ? "Mehrere Quellen belegt:" : "Einzelbeleg:"}
+              </p>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
+                {msg.sources.map((src,i) =>
+                  <SourceBadge key={i} source={src} onCheck={onSourceCheck} style={citStyle} />)}
+              </div>
+            </div>}
+
+          {/* Add source CTA */}
+          {msg.confidenceLevel==="low" &&
+            <button style={{ marginTop:8, fontSize:11, color:"#2563eb", background:"none",
+              border:"none", cursor:"pointer", display:"flex", alignItems:"center", gap:4, fontFamily:"inherit" }}>
+              <IcFile size={11} color="#2563eb" /> Quelle zur Bibliothek hinzufügen
+            </button>}
+
+          {/* Cite panel */}
+          {showCite && msg.sources?.length > 0 &&
+            <div style={{ marginTop:10, background:"#f8fafc", border:"1px solid #e2e8f0",
+              borderRadius:8, padding:"10px 12px" }}>
+              <p style={{ fontSize:11, color:"#64748b", marginBottom:6, fontWeight:500 }}>Zitation generieren:</p>
+              <div style={{ display:"flex", flexDirection:"column", gap:5 }}>
+                {msg.sources.map((src,i) => {
+                  const apa = `${src.author} (${src.year}). ${src.title}. S. ${src.page}.`;
+                  const fn  = `${src.author}, ${src.title}, ${src.year}, S. ${src.page}.`;
+                  return (
+                    <div key={i} style={{ fontSize:11, color:"#374151",
+                      background:"#fff", border:"1px solid #e2e8f0",
+                      borderRadius:6, padding:"6px 10px" }}>
+                      <span style={{ color:"#94a3b8" }}>APA: </span>{apa}<br/>
+                      <span style={{ color:"#94a3b8" }}>Fußnote: </span>{fn}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>}
+        </div>
+
+        {/* Action row */}
+        <div style={{ display:"flex", alignItems:"center", gap:4, marginTop:6, paddingLeft:4, flexWrap:"wrap" }}>
+          <button onClick={() => { navigator.clipboard?.writeText(msg.text).catch(()=>{}); setCopied(true); setTimeout(()=>setCopied(false),1500); }}
+            style={{ display:"flex", alignItems:"center", gap:4, fontSize:11,
+              color:"#94a3b8", padding:"4px 8px", borderRadius:6, border:"none",
+              background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+            {copied ? <IcCheck size={12} color="#10b981" /> : <IcCopy size={12} color="currentColor" />}
+            {copied ? <span style={{color:"#10b981"}}>Kopiert</span> : "Kopieren"}
+          </button>
+          <button onClick={() => setSaved(s=>!s)}
+            style={{ display:"flex", alignItems:"center", gap:4, fontSize:11,
+              color: saved?"#2563eb":"#94a3b8", padding:"4px 8px", borderRadius:6, border:"none",
+              background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+            <IcBookmark size={12} color={saved?"#2563eb":"currentColor"} />
+            {saved ? "Gespeichert" : "Speichern"}
+          </button>
+          {msg.sources?.length > 0 &&
+            <button onClick={() => setShowCite(s=>!s)}
+              style={{ display:"flex", alignItems:"center", gap:4, fontSize:11,
+                color: showCite?"#2563eb":"#94a3b8", padding:"4px 8px", borderRadius:6, border:"none",
+                background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+              <IcQuote size={12} color={showCite?"#2563eb":"currentColor"} />
+              Zitation
+            </button>}
+          <button style={{ display:"flex", alignItems:"center", gap:4, fontSize:11,
+            color:"#94a3b8", padding:"4px 8px", borderRadius:6, border:"none",
+            background:"transparent", cursor:"pointer", fontFamily:"inherit" }}>
+            <IcLink size={12} color="currentColor" /> Kapitel verknüpfen
+          </button>
+          <div style={{ display:"flex", gap:2, marginLeft:"auto" }}>
+            <button onClick={() => onFeedback(msg.id,"up")}
+              style={{ padding:6, borderRadius:6, border:"none", background:"transparent", cursor:"pointer" }}>
+              <IcThumbUp size={12} color={msg.feedback==="up"?"#10b981":"#cbd5e1"} />
+            </button>
+            <button onClick={() => onFeedback(msg.id,"down")}
+              style={{ padding:6, borderRadius:6, border:"none", background:"transparent", cursor:"pointer" }}>
+              <IcThumbDown size={12} color={msg.feedback==="down"?"#ef4444":"#cbd5e1"} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Placeholder page ── */
+function PlaceholderPage({ label, Icon }) {
+  return (
+    <div style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center",
+      justifyContent:"center", gap:12, color:"#94a3b8", padding:40 }}>
+      <Icon size={40} color="#cbd5e1" />
+      <p style={{ fontSize:16, fontWeight:500, color:"#64748b" }}>{label}</p>
+      <p style={{ fontSize:13, textAlign:"center", maxWidth:260, lineHeight:1.6 }}>
+        Dieser Bereich ist in Phase 3 (High-Fidelity MVP) vorgesehen.
+      </p>
+    </div>
+  );
+}
+
+/* ── KI Chat ── */
+function KIChat() {
+  const [messages, setMessages]       = useState(INIT_MSGS);
+  const [input, setInput]             = useState("");
+  const [scope, setScope]             = useState(SCOPES[0]);
+  const [scopeOpen, setScopeOpen]     = useState(false);
+  const [modalSrc, setModalSrc]       = useState(null);
+  const [isTyping, setIsTyping]       = useState(false);
+  const [lang, setLang]               = useState("de");
+  const [ansLen, setAnsLen]           = useState("normal");
+  const [citStyle, setCitStyle]       = useState("apa");
+  const [histSearch, setHistSearch]   = useState("");
+  const [showSearch, setShowSearch]   = useState(false);
+  const bottomRef = useRef(null);
+  const scopeRef  = useRef(null);
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:"smooth" }); }, [messages, isTyping]);
+
+  useEffect(() => {
+    const h = (e) => { if (scopeRef.current && !scopeRef.current.contains(e.target)) setScopeOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const send = (text) => {
+    const q = text || input.trim();
+    if (!q) return;
+    setInput("");
+    setMessages(p => [...p, { id:Date.now(), role:"user", text:q }]);
+    setIsTyping(true);
+    setTimeout(() => {
+      setIsTyping(false);
+      setMessages(p => [...p, {
+        id:Date.now()+1, role:"assistant",
+        text: lang==="de"
+          ? "Ich habe deine Bibliothek durchsucht. Für diese Frage konnte ich begrenzte Belege finden – ich empfehle, weitere Quellen hinzuzufügen."
+          : "I searched your library. Limited evidence was found – consider adding more sources.",
+        confidence:32, confidenceLabel:"Mittlere Sicherheit", confidenceLevel:"mid",
+        sources:[], sourceCount:"none", feedback:null,
+        warning:"Nur ein teilweiser Beleg in deinen Quellen gefunden.",
+        conflictWarning:false,
+      }]);
+    }, 1400);
+  };
+
+  const setFeedback = (id, type) => {
+    setMessages(p => p.map(m => m.id===id ? {...m, feedback:type} : m));
+  };
+
+  const visibleMsgs = histSearch
+    ? messages.filter(m => m.text?.toLowerCase().includes(histSearch.toLowerCase()))
+    : messages;
+
+  const btnBase = { fontSize:11, border:"1px solid #e2e8f0", borderRadius:8,
+    padding:"4px 10px", cursor:"pointer", fontFamily:"inherit", background:"#fff", color:"#475569" };
+  const btnActive = { ...btnBase, background:"#eff6ff", color:"#2563eb", borderColor:"#bfdbfe" };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", height:"100%", position:"relative", background:"#f8fafc" }}>
+
+      {/* ── Header ── */}
+      <div style={{ display:"flex", alignItems:"center", gap:10, padding:"12px 16px",
+        background:"#fff", borderBottom:"1px solid #e2e8f0", flexWrap:"wrap", gap:8 }}>
+        <div style={{ width:32, height:32, borderRadius:10, background:"#2563eb",
+          display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+          <IcMsg size={15} color="#fff" />
+        </div>
+        <div>
+          <p style={{ fontSize:14, fontWeight:500, color:"#1e293b" }}>KI-Chat</p>
+          <p style={{ fontSize:11, color:"#94a3b8" }}>durchsucht nur deine lokalen PDFs</p>
+        </div>
+
+        {/* Controls */}
+        <div style={{ marginLeft:"auto", display:"flex", alignItems:"center", gap:6, flexWrap:"wrap" }}>
+          {/* History search */}
+          <button onClick={() => setShowSearch(s=>!s)}
+            style={{ ...showSearch ? btnActive : btnBase, display:"flex", alignItems:"center", gap:4 }}>
+            <IcSearch size={11} color="currentColor" /> Verlauf
+          </button>
+
+          {/* Lang */}
+          <div style={{ display:"flex", gap:2 }}>
+            <button onClick={() => setLang("de")} style={lang==="de" ? btnActive : btnBase}>DE</button>
+            <button onClick={() => setLang("en")} style={lang==="en" ? btnActive : btnBase}>EN</button>
+          </div>
+
+          {/* Answer length */}
+          <div style={{ display:"flex", gap:2 }}>
+            {[["kurz","K"],["normal","N"],["ausführlich","A"]].map(([v,l]) => (
+              <button key={v} onClick={() => setAnsLen(v)} style={ansLen===v ? btnActive : btnBase}>{l}</button>
+            ))}
+          </div>
+
+          {/* Cite style */}
+          <div style={{ display:"flex", gap:2 }}>
+            {["apa","fußnote"].map(v => (
+              <button key={v} onClick={() => setCitStyle(v)} style={citStyle===v ? btnActive : btnBase}>
+                {v==="apa" ? "APA" : "Fußn."}
+              </button>
+            ))}
+          </div>
+
+          {/* Scope */}
+          <div style={{ position:"relative" }} ref={scopeRef}>
+            <button onClick={() => setScopeOpen(s=>!s)}
+              style={{ ...btnBase, display:"flex", alignItems:"center", gap:5 }}>
+              <IcLayers size={11} color="#64748b" />
+              <span style={{ maxWidth:90, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{scope}</span>
+              <IcChevDown size={10} color="#94a3b8" />
+            </button>
+            {scopeOpen &&
+              <div style={{ position:"absolute", right:0, top:"calc(100% + 4px)", background:"#fff",
+                border:"1px solid #e2e8f0", borderRadius:10, boxShadow:"0 4px 16px rgba(0,0,0,0.08)",
+                zIndex:10, minWidth:200, overflow:"hidden" }}>
+                {SCOPES.map(sc =>
+                  <button key={sc} onClick={() => { setScope(sc); setScopeOpen(false); }}
+                    style={{ display:"block", width:"100%", textAlign:"left", fontSize:12,
+                      padding:"9px 14px", border:"none", fontFamily:"inherit", cursor:"pointer",
+                      background: scope===sc ? "#eff6ff" : "transparent",
+                      color: scope===sc ? "#2563eb" : "#475569" }}>
+                    {sc}
+                  </button>)}
+              </div>}
+          </div>
+        </div>
+      </div>
+
+      {/* History search bar */}
+      {showSearch &&
+        <div style={{ padding:"8px 16px", background:"#fff", borderBottom:"1px solid #f1f5f9",
+          display:"flex", alignItems:"center", gap:8 }}>
+          <IcSearch size={14} color="#94a3b8" />
+          <input type="text" placeholder="Chatverlauf durchsuchen…"
+            value={histSearch} onChange={e => setHistSearch(e.target.value)}
+            style={{ flex:1, border:"none", outline:"none", fontSize:13, color:"#1e293b",
+              background:"transparent", fontFamily:"inherit" }} />
+          {histSearch && <button onClick={() => setHistSearch("")}
+            style={{ background:"none", border:"none", cursor:"pointer" }}>
+            <IcX size={14} color="#94a3b8" />
+          </button>}
+        </div>}
+
+      {/* Messages */}
+      <div className="scrollbar-hide"
+        style={{ flex:1, overflowY:"auto", padding:"16px 16px 8px" }}>
+        {visibleMsgs.map(msg =>
+          <ChatMessage key={msg.id} msg={msg}
+            onFeedback={setFeedback} onSourceCheck={setModalSrc} citStyle={citStyle} />)}
+        {isTyping &&
+          <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:12 }}>
+            <div style={{ width:28, height:28, borderRadius:"50%", background:"#f1f5f9",
+              display:"flex", alignItems:"center", justifyContent:"center" }}>
+              <IcLayers size={14} color="#94a3b8" />
+            </div>
+            <div style={{ background:"#fff", border:"1px solid #e2e8f0",
+              borderRadius:"16px 16px 16px 4px", padding:"12px 14px",
+              display:"flex", gap:4, alignItems:"center" }}>
+              <div className="b1" style={{ width:6, height:6, borderRadius:"50%", background:"#cbd5e1" }} />
+              <div className="b2" style={{ width:6, height:6, borderRadius:"50%", background:"#cbd5e1" }} />
+              <div className="b3" style={{ width:6, height:6, borderRadius:"50%", background:"#cbd5e1" }} />
+            </div>
+          </div>}
+        <div ref={bottomRef} />
+      </div>
+
+      {/* Prompt chips */}
+      <div className="scrollbar-hide"
+        style={{ padding:"8px 16px", background:"#fff", borderTop:"1px solid #f1f5f9",
+          display:"flex", gap:8, overflowX:"auto" }}>
+        {PROMPT_CHIPS.map(chip =>
+          <button key={chip} onClick={() => send(chip)}
+            style={{ flexShrink:0, fontSize:11, color:"#2563eb", border:"1px solid #bfdbfe",
+              borderRadius:99, padding:"4px 12px", background:"#fff", cursor:"pointer",
+              whiteSpace:"nowrap", fontFamily:"inherit" }}>
+            {chip}
+          </button>)}
+      </div>
+
+      {/* Input */}
+      <div style={{ padding:"8px 16px 16px", background:"#fff" }}>
+        <div style={{ display:"flex", alignItems:"flex-end", gap:8, background:"#f8fafc",
+          border:"1px solid #e2e8f0", borderRadius:16, padding:"8px 10px" }}>
+          <textarea value={input} rows={1}
+            placeholder={lang==="de" ? "Frage an deine Literatur stellen…" : "Ask your literature a question…"}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={e => { if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); send(); }}}
+            style={{ flex:1, background:"transparent", border:"none", outline:"none",
+              resize:"none", fontSize:13, color:"#1e293b", fontFamily:"inherit",
+              lineHeight:1.5, maxHeight:80 }} />
+          <button onClick={() => send()} disabled={!input.trim()}
+            style={{ flexShrink:0, width:32, height:32, borderRadius:10, border:"none",
+              background: input.trim() ? "#2563eb" : "#e2e8f0", display:"flex",
+              alignItems:"center", justifyContent:"center", cursor: input.trim() ? "pointer" : "default",
+              marginBottom:2 }}>
+            <IcSend size={14} color={input.trim() ? "#fff" : "#94a3b8"} />
+          </button>
+        </div>
+        <p style={{ textAlign:"center", fontSize:11, color:"#94a3b8", marginTop:6 }}>
+          Durchsucht: {scope} · Sprache: {lang.toUpperCase()} · Länge: {ansLen} · Stil: {citStyle.toUpperCase()}
+        </p>
+      </div>
+
+      {modalSrc && <SourceModal source={modalSrc} onClose={() => setModalSrc(null)} />}
+    </div>
+  );
+}
+
+/* ── App Shell ── */
+export default function App() {
+  const [page, setPage] = useState("chat");
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const current = NAV.find(n => n.id===page);
+
+  return (
+    <div style={{ display:"flex", height:"100vh", background:"#f1f5f9", fontFamily:"'Inter',system-ui,sans-serif" }}>
+
+      {/* Sidebar */}
+      <div style={{ width: sidebarOpen ? 220 : 60, flexShrink:0, background:"#fff",
+        borderRight:"1px solid #e2e8f0", display:"flex", flexDirection:"column",
+        transition:"width 0.2s", overflow:"hidden" }}>
+
+        {/* Logo */}
+        <div style={{ padding:"16px 14px", borderBottom:"1px solid #f1f5f9",
+          display:"flex", alignItems:"center", gap:10 }}>
+          <div style={{ width:32, height:32, borderRadius:10, background:"#2563eb",
+            display:"flex", alignItems:"center", justifyContent:"center", flexShrink:0 }}>
+            <IcBookOpen size={16} color="#fff" />
+          </div>
+          {sidebarOpen && <span style={{ fontSize:15, fontWeight:600, color:"#1e293b", whiteSpace:"nowrap" }}>CiteFlow</span>}
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex:1, padding:"10px 8px", display:"flex", flexDirection:"column", gap:2 }}>
+          {NAV.map(({ id, label, Icon, active }) => {
+            const isActive = page===id;
+            return (
+              <button key={id}
+                onClick={() => active && setPage(id)}
+                title={label}
+                style={{
+                  display:"flex", alignItems:"center", gap:10,
+                  padding: sidebarOpen ? "9px 12px" : "9px 14px",
+                  borderRadius:10, border:"none", cursor: active ? "pointer" : "not-allowed",
+                  background: isActive ? "#eff6ff" : "transparent",
+                  color: isActive ? "#2563eb" : active ? "#475569" : "#cbd5e1",
+                  fontFamily:"inherit", fontSize:13, fontWeight: isActive ? 500 : 400,
+                  width:"100%", textAlign:"left", transition:"background 0.15s",
+                  opacity: active ? 1 : 0.5,
+                }}>
+                <Icon size={17} color={isActive ? "#2563eb" : active ? "#64748b" : "#cbd5e1"} />
+                {sidebarOpen && <span style={{ whiteSpace:"nowrap" }}>{label}</span>}
+                {sidebarOpen && !active &&
+                  <span style={{ marginLeft:"auto", fontSize:9, background:"#f1f5f9",
+                    color:"#94a3b8", padding:"1px 6px", borderRadius:99, whiteSpace:"nowrap" }}>
+                    bald
+                  </span>}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Collapse btn */}
+        <button onClick={() => setSidebarOpen(s=>!s)}
+          style={{ margin:"0 8px 12px", padding:"8px 12px", border:"1px solid #e2e8f0",
+            borderRadius:10, background:"transparent", cursor:"pointer", display:"flex",
+            alignItems:"center", gap:8, color:"#94a3b8", fontSize:12, fontFamily:"inherit" }}>
+          <IcChevRight size={14} color="#94a3b8"
+            style={{ transform: sidebarOpen ? "rotate(180deg)" : "rotate(0deg)", transition:"transform 0.2s" }} />
+          {sidebarOpen && "Einklappen"}
+        </button>
+      </div>
+
+      {/* Main content */}
+      <div style={{ flex:1, display:"flex", flexDirection:"column", overflow:"hidden" }}>
+        {/* Top bar */}
+        <div style={{ padding:"12px 20px", background:"#fff", borderBottom:"1px solid #e2e8f0",
+          display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:13, color:"#94a3b8" }}>CiteFlow</span>
+          <IcChevRight size={13} color="#cbd5e1" />
+          <span style={{ fontSize:13, fontWeight:500, color:"#1e293b" }}>{current?.label}</span>
+          {page==="chat" &&
+            <span style={{ marginLeft:"auto", fontSize:11, background:"#eff6ff",
+              color:"#2563eb", padding:"3px 10px", borderRadius:99, border:"1px solid #bfdbfe" }}>
+              Lo-Fi Prototyp · Phase 2
+            </span>}
+        </div>
+
+        {/* Page */}
+        <div style={{ flex:1, overflow:"hidden", display:"flex", flexDirection:"column" }}>
+          {page==="chat"    ? <KIChat /> :
+           page==="library" ? <PlaceholderPage label="Bibliothek" Icon={IcBookOpen} /> :
+           page==="map"     ? <PlaceholderPage label="Knowledge Map" Icon={IcMap} /> :
+           page==="cite"    ? <PlaceholderPage label="Zitieren" Icon={IcQuote} /> :
+           page==="tasks"   ? <PlaceholderPage label="Aufgabenplaner" Icon={IcStar} /> :
+           page==="search"  ? <PlaceholderPage label="Suche" Icon={IcSearch} /> :
+                              <PlaceholderPage label="Einstellungen" Icon={IcSettings} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
